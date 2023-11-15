@@ -15,18 +15,12 @@ const firebaseApp = initializeApp({
 const auth = getAuth(firebaseApp);
 const database = getDatabase(firebaseApp);
 const allPlayersRef = ref(database, 'players');
+const playerCountRef = ref(database, `player_count`);
 const TABLE_ORDER = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes', 'bonus', 'threeOfAKind', 'fourOfAKind', 'fullHouse', 'smStraight', 'lgStraight', 'yahtzee', 'chance', 'total'];
 
-/*
- Player classes:
- - rolling
- - 
-
-
-
-*/
-
-function addNewColumn(playerName, playerId) {
+function addNewColumn(snapshot) {
+    const playerName = snapshot.val().name;
+    const playerId = snapshot.val().id;
     const header = document.querySelector('.header');
     const newHeaderCell = document.createElement('div');
     newHeaderCell.classList.add('header-cell')
@@ -74,18 +68,17 @@ function removeColumn(snapshot){
     let playerRef;
     let gameStateRef;
     let playerCount = 0;
-    let playerCountRef;
 
     function initGame() {
         
         onChildAdded(allPlayersRef, (snapshot) => {
             // A new player joins the game
-            const addedPlayer = snapshot.val();
+
             playerCount++;
-            console.log("Player count after join: ",playerCount);
+            console.log("Player count after join: ", playerCount);
             update(playerCountRef, {count : playerCount});
 
-            addNewColumn(addedPlayer.name, addedPlayer.id);
+            addNewColumn(snapshot);
 
         });
         
@@ -97,15 +90,16 @@ function removeColumn(snapshot){
         onChildRemoved(allPlayersRef, (snapshot) => {
             const removedPlayer = snapshot.val();
             console.log(removedPlayer);
+            playerCount--;
+            update(playerCountRef, {count : playerCount});
             removeColumn(snapshot);
-
 
         });
 
     }
 
     function handleSubmit(event) {
-        event.preventDefault();
+        //event.preventDefault();
         const nameInput = document.getElementById('nameInput');
         const name = nameInput.value;
       
@@ -155,8 +149,6 @@ function removeColumn(snapshot){
                 console.log('Problem setting game state reference');
             }
         });
-
-        playerCountRef = ref(database, `player_count`);
         //playerCount++;
 
       }
