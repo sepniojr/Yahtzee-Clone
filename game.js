@@ -26,8 +26,8 @@ let playerDice;
 // give player 'turn' attribute when its their turn (true/false) 
 // 
 
-function initDice(){
-    
+function resetDice(){
+    console.log("Resetting dice...");
     for (let i=0; i<5; i++){
         let gameStateDiceInit = ref(database, `game_state/dice/dice${i+1}`);
         set(gameStateDiceInit, {
@@ -41,22 +41,25 @@ function initDice(){
 
 
 function startGame() {
-    // Initialize dice
+    // Initialize/reset dice
+    console.log("In start game");
+    resetDice();
 
-    initDice();
-    displayDiceRoll();
+    //displayDiceRoll();
     //displayTempScores();
+
     startTurn();
-    
+
 }
 
 function startTurn() {
-
+    console.log("In start turn");
     // Add indicator on screen as to who's turn it is
     // Only the player in playerId has permission to click 'roll'
 
     rollCount = 0;
     playerDice = [];
+
 
     diceElements.forEach(dice => {
         dice.addEventListener('click', function() {
@@ -71,14 +74,42 @@ function startTurn() {
 
     // Listener for roll button
     rollButton.addEventListener("click", () => {
-        let diceArr = createDiceToRoll();
-        console.log("Dice array: ", diceArr);
-        rollDice(diceArr); 
+        //TODO: Later, if rollCount < 4 OR if a table selection was not made
+        if (rollCount < 4){
+            let diceArr = createDiceToRoll();
+            playerDice = rollDice(diceArr); 
+            console.log("Player has rolled: ", playerDice);
+            rollCount++;
+            console.log(rollCount);
+            
+            
+            calculateTempScores(playerDice)
+            if (rollCount === 4){
+                //Make user select a row
+                // End turn
+                endTurn();
+            }
+        } else {
+            console.log("Can't roll any more!");
+        }
+
     });
 
+    displayDiceRoll();
+    displayTempScores();
+    
+    
+    
 
-    displayDiceRoll()
 }
+
+    function endTurn(){
+        // Change who's turn it is
+        // Reset dice
+
+        resetDice();
+        console.log("Ending turn");
+    }
 
     function createDiceToRoll(){
         let diceArr = []
@@ -93,7 +124,7 @@ function startTurn() {
             });
 
         } else {
-            diceArr = [1,2,3,4,5];
+            diceArr = [0,0,0,0,0];
         }
 
         return diceArr;
@@ -103,7 +134,6 @@ function startTurn() {
     function rollDice(diceArr) {
         // diceArr is an array of the indices of the dice to be re-rolled
         gameStateDiceRef = ref(database, `game_state/dice`);
-        rollCount++;
         
 
 
@@ -116,11 +146,12 @@ function startTurn() {
             update(gameStateDiceRef, {[`dice${currDice}/img`] : "dice" + diceRoll + ".png"});
         }
 
-        console.log("Player dice: ", playerDice);
+        return playerDice;
         //calculateOnes(playerDice)
     }
 
     function displayDiceRoll(){
+        console.log("In display dice roll");
         gameStateDiceRef = ref(database, `game_state/dice`);
 
         // Updates whenever changes in game_state/dice occur
@@ -135,9 +166,46 @@ function startTurn() {
             }
 
         });
+
+    }
+
+    function calculateTempScores(playerDice){
+        console.log("In displayTempScores", playerDice );
+        //TODO: Make currentPlayer change depending on who's turn it is
+        let currentPlayer = turnOrder[0];
+        gameStatePlayerTotals = ref(database, `game_state/players/${currentPlayer}`)
+
+        update(gameStatePlayerTotals, {
+            ones: calculateOnes(playerDice),
+            twos: calculateTwos(playerDice),
+            threes: calculateThrees(playerDice),
+            fours: calculateFours(playerDice),
+            fives: calculateFives(playerDice),
+            sixes: calculateSixes(playerDice)
+        });
+
+
     }
 
 
+    function displayTempScores(){
+        let currentPlayer = turnOrder[0];
+        gameStatePlayerTotals = ref(database, `game_state/players/${currentPlayer}`)
+
+        onValue(gameStatePlayerTotals, (snapshot) => {
+            const rowElements = document.querySelectorAll('.cell[id*="' + currentPlayer + '"]')
+            const rows = Array.from(rowElements);
+
+            rows[0].textContent = snapshot.val().ones;
+            rows[1].textContent = snapshot.val().twos;
+            rows[2].textContent = snapshot.val().threes;
+            rows[3].textContent = snapshot.val().fours;
+            rows[4].textContent = snapshot.val().fives;
+            rows[5].textContent = snapshot.val().sixes;
+
+        });
+
+    }
 
     function calculateOnes(playerDice){
         let score = 0;
@@ -149,15 +217,57 @@ function startTurn() {
         return score;
 
     }
+    function calculateTwos(playerDice){
+        let score = 0;
+        for (let i = 0; i < playerDice.length; i++){
+            if (playerDice[i] === 2){
+                score+= 2;
+            }
+        }
+        return score;
 
-    function displayTempScores(){
-        currentPlayer = turnOrder[0];
-        gameStatePlayerTotals = ref(database, `game_state/players/${currentPlayer}`)
-        onValue(gameStatePlayerTotals, (snapshot) => {
-            const rowElements = document.querySelectorAll('.cell[id*="' + playerId + '"]')
-            rowElements.forEach((row, index) => {
-                console.log(row);
-            });
-        });
+    }
+
+    function calculateThrees(playerDice){
+        let score = 0;
+        for (let i = 0; i < playerDice.length; i++){
+            if (playerDice[i] === 3){
+                score+= 3;
+            }
+        }
+        return score;
+
+    }
+
+    function calculateFours(playerDice){
+        let score = 0;
+        for (let i = 0; i < playerDice.length; i++){
+            if (playerDice[i] === 4){
+                score+= 4;
+            }
+        }
+        return score;
+
+    }
+
+    function calculateFives(playerDice){
+        let score = 0;
+        for (let i = 0; i < playerDice.length; i++){
+            if (playerDice[i] === 5){
+                score+= 5;
+            }
+        }
+        return score;
+
+    }
+
+    function calculateSixes(playerDice){
+        let score = 0;
+        for (let i = 0; i < playerDice.length; i++){
+            if (playerDice[i] === 6){
+                score+= 6;
+            }
+        }
+        return score;
 
     }
