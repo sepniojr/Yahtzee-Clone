@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-auth.js";
 import { getDatabase, ref, set, child, get, onValue, onChildAdded, onChildRemoved, onDisconnect, update} from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
-
+export { auth, database, playerList}
 const firebaseApp = initializeApp({
     apiKey: "AIzaSyDG5c9Diyi5W3tuefA72csagd8LPXxvicU",
     authDomain: "yahtzee-game-bf8b8.firebaseapp.com",
@@ -17,6 +17,7 @@ const database = getDatabase(firebaseApp);
 const allPlayersRef = ref(database, 'players');
 const playerCountRef = ref(database, `player_count`);
 const TABLE_ORDER = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes', 'bonus', 'threeOfAKind', 'fourOfAKind', 'fullHouse', 'smStraight', 'lgStraight', 'yahtzee', 'chance', 'total'];
+let playerList = [];
 
 function addNewColumn(snapshot) {
     const playerName = snapshot.val().name;
@@ -31,9 +32,7 @@ function addNewColumn(snapshot) {
 
     // Loop through each row and add a new cell for the new column
     rows.forEach((row, index) => {
-
         const newCell = document.createElement('div');
-
         const newCellId = TABLE_ORDER[index] + playerId;
 
         newCell.classList.add('cell');
@@ -42,13 +41,10 @@ function addNewColumn(snapshot) {
         row.appendChild(newCell);
     });
 
-    //const test = document.querySelector('#ones1');
-    //console.log(test);
 
 }
 
 function removeColumn(snapshot){
-    const playerName = snapshot.val().name;
     const playerId = snapshot.val().id;
 
     const headerCell = document.querySelector('.header-cell[id*="' + playerId + '"]');
@@ -64,7 +60,6 @@ function removeColumn(snapshot){
 (function () {
 
     let playerId;
-    let players = {};
     let playerRef;
     let gameStateRef;
     let playerCount = 0;
@@ -77,6 +72,9 @@ function removeColumn(snapshot){
             playerCount++;
             console.log("Player count after join: ", playerCount);
             update(playerCountRef, {count : playerCount});
+
+            playerList.push(snapshot.val().id);
+            console.log("Player list after join: ", playerList);
 
             addNewColumn(snapshot);
 
@@ -92,6 +90,10 @@ function removeColumn(snapshot){
             console.log(removedPlayer);
             playerCount--;
             update(playerCountRef, {count : playerCount});
+
+            playerList.splice(playerList.indexOf(removedPlayer.id), 1);
+
+            console.log("Player list after leaving: ", playerList);
             removeColumn(snapshot);
 
         });
@@ -149,8 +151,6 @@ function removeColumn(snapshot){
                 console.log('Problem setting game state reference');
             }
         });
-        //playerCount++;
-
       }
       
       // Function to trigger onAuthStateChanged
