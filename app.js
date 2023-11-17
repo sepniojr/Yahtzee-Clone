@@ -72,7 +72,7 @@ function removeColumn(snapshot){
         console.log("Starting game");
         update(gameStartedRef, {isGameStarted: true});
 
-        startGame();
+        
     });
 
     function initGame() {
@@ -89,6 +89,7 @@ function removeColumn(snapshot){
                  */
                 submitButton.style.display = 'none';
                 startGameButton.style.display = 'none';
+                startGame();
             } else {
                 update(gameStartedRef, {isGameStarted: false});
             }
@@ -209,6 +210,10 @@ function removeColumn(snapshot){
                 if (playerRef) {
                     onDisconnect(playerRef).remove();
                     onDisconnect(gameStateRef).remove();
+
+                    // TODO: Remove
+                    onDisconnect(ref(database, 'game_state')).remove()
+
                     playerCount--;
                     update(playerCountRef, {count : playerCount});
                 }
