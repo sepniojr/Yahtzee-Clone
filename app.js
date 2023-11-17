@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-app.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-auth.js";
 import { getDatabase, ref, set, child, get, onValue, onChildAdded, onChildRemoved, onDisconnect, update} from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
+import { startGame } from "/game.js"
 export { auth, database, playerList}
 const firebaseApp = initializeApp({
     apiKey: "AIzaSyDG5c9Diyi5W3tuefA72csagd8LPXxvicU",
@@ -16,7 +17,9 @@ const auth = getAuth(firebaseApp);
 const database = getDatabase(firebaseApp);
 const allPlayersRef = ref(database, 'players');
 const playerCountRef = ref(database, `player_count`);
+const gameStartedRef = ref(database, `game_state/isGameStarted`);
 const TABLE_ORDER = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes', 'bonus', 'threeOfAKind', 'fourOfAKind', 'fullHouse', 'smStraight', 'lgStraight', 'yahtzee', 'chance', 'total'];
+const startGameButton = document.getElementById("startGameButton");
 let playerList = [];
 
 function addNewColumn(snapshot) {
@@ -63,9 +66,35 @@ function removeColumn(snapshot){
     let playerRef;
     let gameStateRef;
     let playerCount = 0;
+                    
+    
+    startGameButton.addEventListener('click', function() {
+        console.log("Starting game");
+        update(gameStartedRef, {isGameStarted: true});
+
+        startGame();
+    });
 
     function initGame() {
-        
+        console.log("In init game");
+
+
+        onValue(gameStartedRef, (snapshot) => {
+            const isGameStarted = snapshot.val().isGameStarted;
+            console.log("Is game started? ", isGameStarted);
+            if (isGameStarted) {
+                const submitButton = document.getElementById("submitButton");
+                /**
+                 * TODO: Find a better way to disable start/submit buttons
+                 */
+                submitButton.style.display = 'none';
+                startGameButton.style.display = 'none';
+            } else {
+                update(gameStartedRef, {isGameStarted: false});
+            }
+
+        });
+
         onChildAdded(allPlayersRef, (snapshot) => {
             // A new player joins the game
 
@@ -80,11 +109,6 @@ function removeColumn(snapshot){
 
         });
         
-        onValue(allPlayersRef, (snapshot) => {
-            // A change in the player node occurs (someone leaves)
-
-        });
-
         onChildRemoved(allPlayersRef, (snapshot) => {
             const removedPlayer = snapshot.val();
             console.log(removedPlayer);
@@ -100,22 +124,34 @@ function removeColumn(snapshot){
 
     }
 
-    function handleSubmit(event) {
+    // If game has started, disable submit
+
+    function playerJoin(event) {
         //event.preventDefault();
         const nameInput = document.getElementById('nameInput');
         const name = nameInput.value;
-      
+        
         // Add the player's name to the Firebase Realtime Database
         playerRef = ref(database, `players/${playerId}`);
         get(playerRef).then((snapshot) => {
             if (!snapshot.exists()) {
                 console.log(`Adding ${name} to player database`);
-                // Player does not exist, so set player data
-                set(playerRef, {
-                    id: playerId,
-                    name: name
-                });
-
+                if (playerList.length === 0) {
+                    // This player is the host
+                    // TODO: Find way to change host when original host leaves the game
+                    set(playerRef, {
+                        id: playerId,
+                        name: name,
+                        host: true
+                    });
+                } else {
+                    // Player is not host
+                    set(playerRef, {
+                        id: playerId,
+                        name: name,
+                        host: false
+                    });
+                }
             } else {
                 console.log('Problem setting player reference');
             }
@@ -123,13 +159,14 @@ function removeColumn(snapshot){
 
         });
 
-        gameStateRef = ref(database, `game_state/${playerId}`);
+        gameStateRef = ref(database, `game_state/players/${playerId}`);
         get(gameStateRef).then((snapshot) => {
             if (!snapshot.exists()) {
                 console.log(`Adding ${name} to game state database`);
                 // Player does not exist, so set player data
                 set(gameStateRef, {
                     id: playerId,
+                    turn: false,
                     ones: 0,
                     twos: 0,
                     threes: 0,
@@ -151,16 +188,18 @@ function removeColumn(snapshot){
                 console.log('Problem setting game state reference');
             }
         });
+
+
       }
       
-      // Function to trigger onAuthStateChanged
-      function checkAuthState() {
+        // Function to trigger onAuthStateChanged
+    function checkAuthState() {
         auth.onAuthStateChanged(user => {
-          if (user) {
+        if (user) {
             // User is signed in
             console.log('User is signed in:', user.uid);
             playerId = user.uid;
-            gameStateRef = ref(database, `game_state/${playerId}`);
+            gameStateRef = ref(database, `game_state/players/${playerId}`);
 
 
             initGame();
@@ -175,22 +214,26 @@ function removeColumn(snapshot){
                 }
             });
 
-          } else {
+        } else {
             // User is signed out
             console.log('User is signed out');
             // You can perform actions here after the user signs out
-          }
+        }
         });
-      }
-      
-      // Listener for form
-      document.addEventListener('DOMContentLoaded', function () {
+    } 
+
+    
+    // Listener for form
+    document.addEventListener('DOMContentLoaded', function () {
         const nameForm = document.getElementById('nameForm');
-        nameForm.addEventListener('submit', handleSubmit);
-      
+
+        nameForm.addEventListener('submit', playerJoin);
+
+
+    
         // Trigger onAuthStateChanged when the page loads
         checkAuthState();
-      });
+    });
 
 
     signInAnonymously(auth).catch((error) => {
@@ -199,6 +242,8 @@ function removeColumn(snapshot){
 
         console.log(errorCode, errorMessage);
     });
+
+
 
 
 })();
