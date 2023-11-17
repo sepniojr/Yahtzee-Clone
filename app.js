@@ -77,23 +77,34 @@ function removeColumn(snapshot){
 
     function initGame() {
         console.log("In init game");
-
+        
+        get(gameStartedRef).then((snapshot) => {
+            if (!snapshot.exists()) {
+                set(gameStartedRef, {
+                    isGameStarted : false
+                });
+            } else {
+                console.log("Error setting up game started reference");
+            }
+        });
 
         onValue(gameStartedRef, (snapshot) => {
-            const isGameStarted = snapshot.val().isGameStarted;
-            console.log("Is game started? ", isGameStarted);
-            if (isGameStarted) {
-                const submitButton = document.getElementById("submitButton");
-                /**
-                 * TODO: Find a better way to disable start/submit buttons
-                 */
-                submitButton.style.display = 'none';
-                startGameButton.style.display = 'none';
-                startGame();
-            } else {
-                update(gameStartedRef, {isGameStarted: false});
+            if (snapshot.exists()){
+                const isGameStarted = snapshot.val().isGameStarted;
+                console.log("Is game started? ", isGameStarted);
+                if (isGameStarted) {
+                    const submitButton = document.getElementById("submitButton");
+                    /**
+                     * TODO: Find a better way to disable start/submit buttons
+                     */
+                    submitButton.style.display = 'none';
+                    startGameButton.style.display = 'none';
+                    startGame();
+                } else {
+                    update(gameStartedRef, {isGameStarted: false});
+                }
             }
-
+        
         });
 
         onChildAdded(allPlayersRef, (snapshot) => {
@@ -162,6 +173,7 @@ function removeColumn(snapshot){
 
         gameStateRef = ref(database, `game_state/players/${playerId}`);
         get(gameStateRef).then((snapshot) => {
+            //TODO: Add error checking for all gets
             if (!snapshot.exists()) {
                 console.log(`Adding ${name} to game state database`);
                 // Player does not exist, so set player data
@@ -191,6 +203,8 @@ function removeColumn(snapshot){
         });
 
 
+
+
       }
       
         // Function to trigger onAuthStateChanged
@@ -210,9 +224,12 @@ function removeColumn(snapshot){
                 if (playerRef) {
                     onDisconnect(playerRef).remove();
                     onDisconnect(gameStateRef).remove();
-
+                    onDisconnect(ref(database, 'player_count')).remove()
+                    
                     // TODO: Remove
                     onDisconnect(ref(database, 'game_state')).remove()
+
+
 
                     playerCount--;
                     update(playerCountRef, {count : playerCount});
