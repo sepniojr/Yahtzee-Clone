@@ -1,23 +1,13 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-app.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-auth.js";
-import { getDatabase, ref, set, child, get, onValue, onChildAdded, onChildRemoved, onDisconnect, update} from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
-import { startGame } from "/game.js"
-export { auth, database, playerList}
-const firebaseApp = initializeApp({
-    apiKey: "AIzaSyDG5c9Diyi5W3tuefA72csagd8LPXxvicU",
-    authDomain: "yahtzee-game-bf8b8.firebaseapp.com",
-    databaseURL: "https://yahtzee-game-bf8b8-default-rtdb.firebaseio.com",
-    projectId: "yahtzee-game-bf8b8",
-    storageBucket: "yahtzee-game-bf8b8.appspot.com",
-    messagingSenderId: "686029158976",
-    appId: "1:686029158976:web:6d4904b462188be94b3da5"
-  });
 
-const auth = getAuth(firebaseApp);
-const database = getDatabase(firebaseApp);
+import { signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-auth.js";
+import { ref, set, child, get, onValue, onChildAdded, onChildRemoved, onDisconnect, update} from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
+import { auth, database } from "/firebase.js"
+export { playerList}
+
 const allPlayersRef = ref(database, 'players');
 const playerCountRef = ref(database, `player_count`);
 const gameStartedRef = ref(database, `game_state/isGameStarted`);
+const gameRollsRef = ref(database, 'game_state/current_roll');
 const TABLE_ORDER = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes', 'bonus', 'threeOfAKind', 'fourOfAKind', 'fullHouse', 'smStraight', 'lgStraight', 'yahtzee', 'chance', 'total'];
 const startGameButton = document.getElementById("startGameButton");
 let playerList = [];
@@ -38,7 +28,7 @@ function addNewColumn(snapshot) {
         const newCell = document.createElement('div');
         const newCellId = TABLE_ORDER[index] + playerId;
 
-        newCell.classList.add('cell');
+        newCell.classList.add('cell', 'clickableCell');
         newCell.setAttribute('id', newCellId);
         newCell.textContent = '';
         row.appendChild(newCell);
@@ -69,22 +59,36 @@ function removeColumn(snapshot){
                     
     
     startGameButton.addEventListener('click', function() {
-        console.log("Starting game");
+        //console.log("Starting game");
         update(gameStartedRef, {isGameStarted: true});
-
+        update((ref(database, 'game_state')), {turn: `${playerList[0]}`});
+        set(gameRollsRef, {                    
+            ones: 0,
+            twos: 0,
+            threes: 0,
+            fours: 0,
+            fives: 0,
+            sixes: 0,
+            bonuses: 0,
+            threeOfAKind: 0,
+            fourOfAKind: 0,
+            fullHouse: 0,
+            smStraight: 0,
+            lgStraight: 0,
+            yahtzee: 0,
+            chance: 0,
+            total: 0});
         
     });
 
     function initGame() {
-        console.log("In init game");
-        
         get(gameStartedRef).then((snapshot) => {
             if (!snapshot.exists()) {
                 set(gameStartedRef, {
                     isGameStarted : false
                 });
             } else {
-                console.log("Error setting up game started reference");
+                console.log("Game started ref already exists.");
             }
         });
 
@@ -99,7 +103,6 @@ function removeColumn(snapshot){
                      */
                     submitButton.style.display = 'none';
                     startGameButton.style.display = 'none';
-                    startGame();
                 } else {
                     update(gameStartedRef, {isGameStarted: false});
                 }
@@ -154,14 +157,16 @@ function removeColumn(snapshot){
                     set(playerRef, {
                         id: playerId,
                         name: name,
-                        host: true
+                        host: true,
+                        turn: true
                     });
                 } else {
                     // Player is not host
                     set(playerRef, {
                         id: playerId,
                         name: name,
-                        host: false
+                        host: false,
+                        turn: false
                     });
                 }
             } else {
@@ -169,6 +174,8 @@ function removeColumn(snapshot){
             }
 
 
+        }).catch((error) => {
+            console.error('Problem setting player reference', error)
         });
 
         gameStateRef = ref(database, `game_state/players/${playerId}`);
@@ -179,7 +186,6 @@ function removeColumn(snapshot){
                 // Player does not exist, so set player data
                 set(gameStateRef, {
                     id: playerId,
-                    turn: false,
                     ones: 0,
                     twos: 0,
                     threes: 0,
@@ -216,7 +222,6 @@ function removeColumn(snapshot){
             playerId = user.uid;
             gameStateRef = ref(database, `game_state/players/${playerId}`);
 
-
             initGame();
 
             window.addEventListener('beforeunload', () => {
@@ -224,13 +229,11 @@ function removeColumn(snapshot){
                 if (playerRef) {
                     onDisconnect(playerRef).remove();
                     onDisconnect(gameStateRef).remove();
-                    onDisconnect(ref(database, 'player_count')).remove()
-                    
+                    onDisconnect(ref(database, 'player_count')).remove();
+
                     // TODO: Remove
-                    onDisconnect(ref(database, 'game_state')).remove()
-
-
-
+                    onDisconnect(ref(database, 'game_state')).remove();
+                    onDisconnect(ref(database, 'game_state/isGameStarted')).remove();
                     playerCount--;
                     update(playerCountRef, {count : playerCount});
                 }
