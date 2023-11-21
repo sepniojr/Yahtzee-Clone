@@ -227,6 +227,9 @@ function removeColumn(snapshot){
             window.addEventListener('beforeunload', () => {
                 // Remove player from the game on browser/tab close
                 if (playerRef) {
+                    playerCount--;
+                    update(playerCountRef, {count : playerCount});
+                    
                     onDisconnect(playerRef).remove();
                     onDisconnect(gameStateRef).remove();
                     onDisconnect(ref(database, 'player_count')).remove();
@@ -234,8 +237,7 @@ function removeColumn(snapshot){
                     // TODO: Remove
                     onDisconnect(ref(database, 'game_state')).remove();
                     onDisconnect(ref(database, 'game_state/isGameStarted')).remove();
-                    playerCount--;
-                    update(playerCountRef, {count : playerCount});
+                    
                 }
             });
 

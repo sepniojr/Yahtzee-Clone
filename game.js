@@ -18,13 +18,14 @@ diceElements.forEach(dice => {
 });
 
 const rollButton = document.getElementById("rollButton");
-
+let rowElements;
 
 const gameStateRef = ref(database, 'game_state');
 const gameStateTurnRef = ref(database, `game_state/turn`);
 const playerCountRef = ref(database, 'player_count');
 const gameRollsRef = ref(database, 'game_state/current_roll');
-const rollCheckRef = ref(database, 'game_state/isRollClicked')
+const rollCheckRef = ref(database, 'game_state/isRollClicked');
+const rowClickCheckRef = ref(database, 'game_state/isRowClicked');
 const gameStartedRef = ref(database, `game_state/isGameStarted/isGameStarted`);
 const gameStateDiceRef = ref(database, `game_state/dice`);
 
@@ -43,7 +44,10 @@ function changeTurn(){
      * Function responsible for changing the value of currentPlayer
      */
 
+    setRowElements();
+
     if (!isFirstTurn){
+        console.log("This is NOT the first turn");
         let indexOfCurrentPlayer = playerList.indexOf(currentPlayer);
 
         // Change the previous player's turn to false
@@ -69,6 +73,7 @@ function changeTurn(){
         console.log("Next player's turn: ", currentPlayer);
         
     } else {
+        console.log("This is the first turn");
         currentPlayer = playerList[0];
         isFirstTurn = false;
     }
@@ -88,14 +93,43 @@ function changeRollButtonVisibility(){
     });
 }
 
-function setCurrentPlayerStartOfGame(){
+function setDataStartOfGame(){
     // Set current player to first player in playerList
     onValue(gameStartedRef, (snapshot) => {
         let isGameStarted = snapshot.val();
         if (isGameStarted){
-            currentPlayer = playerList[0];
+            //currentPlayer = playerList[0];
+            changeTurn()
+
+
         }
     });
+}
+
+function setRowElements(){
+    onValue(gameStartedRef, (snapshot) => {
+        console.log("Row element set triggered")
+        let rowElements = document.querySelectorAll('.clickableCell');
+
+        rowElements.forEach(row => {
+            row.removeEventListener('click', rowClickHandler);
+            row.addEventListener('click', rowClickHandler);
+        });
+    });
+}
+
+function rowClickHandler(event){
+    if (auth.currentUser.uid === currentPlayer){
+        update(gameStateRef, {isRowClicked: true});
+    } else {
+        console.log("It's not your turn!");
+    }
+    
+
+} 
+
+function rowClickListener(){
+    
 }
 
 function rollButtonListener(){
@@ -138,7 +172,7 @@ function rollDice(){
             }
 
             console.log(playerDice);
-
+            calculateTempScores(playerDice);
         }
     });
 }
@@ -190,20 +224,121 @@ function createDiceToRoll(){
     return diceArr;
 }
 
+function calculateTempScores(playerDice){
+
+    update(gameRollsRef, {
+        ones: calculateOnes(playerDice),
+        twos: calculateTwos(playerDice),
+        threes: calculateThrees(playerDice),
+        fours: calculateFours(playerDice),
+        fives: calculateFives(playerDice),
+        sixes: calculateSixes(playerDice)
+    });
+
+}
+
+function displayTempScores(){
+
+    // CurrentPlayer is being updated properly which is Why Player1 is seeing the correct columns update
+    // However Player2 isnt being updated properly
+    onValue(gameRollsRef, (snapshot) => {
+        if (snapshot.val()){
+            console.log("In displayTempScores ", currentPlayer );
+            const playerRowElements = document.querySelectorAll('.cell[id*="' + currentPlayer + '"]')
+            //console.log(auth.currentUser.uid);
+            const rows = Array.from(playerRowElements);
+
+            rows[0].textContent = snapshot.val().ones;
+            rows[1].textContent = snapshot.val().twos;
+            rows[2].textContent = snapshot.val().threes;
+            rows[3].textContent = snapshot.val().fours;
+            rows[4].textContent = snapshot.val().fives;
+            rows[5].textContent = snapshot.val().sixes;
+        }
+   
+
+    });
+}
+
 (function()  {
     // Set current player to first player in playerList
-    setCurrentPlayerStartOfGame();
+    setDataStartOfGame();
     // Change visibility of roll button when player turn changes
     changeRollButtonVisibility();
     rollButtonListener();
-    //rollDice();
+    displayTempScores();
     displayDiceRoll();
     // ChangeTurn() should actually be called when the user clicks a row element, but NOT within a click listener
     // But instead via listening to the database. Clicking a row element should update a value in the database
     // Which will be listened to and then changeTurn() will be called.
-    onValue(ref(database, 'test'), (snapshot) => {
+    onChildAdded(ref(database, 'test'), (snapshot) => {
         console.log("CHANGING TURN MANUALLY ACTIVATED BY USER");
         changeTurn();
     });
 
 })();
+
+function calculateOnes(playerDice){
+    let score = 0;
+    for (let i = 0; i < playerDice.length; i++){
+        if (playerDice[i] === 1){
+            score+= 1;
+        }
+    }
+    return score;
+
+}
+function calculateTwos(playerDice){
+    let score = 0;
+    for (let i = 0; i < playerDice.length; i++){
+        if (playerDice[i] === 2){
+            score+= 2;
+        }
+    }
+    return score;
+
+}
+
+function calculateThrees(playerDice){
+    let score = 0;
+    for (let i = 0; i < playerDice.length; i++){
+        if (playerDice[i] === 3){
+            score+= 3;
+        }
+    }
+    return score;
+
+}
+
+function calculateFours(playerDice){
+    let score = 0;
+    for (let i = 0; i < playerDice.length; i++){
+        if (playerDice[i] === 4){
+            score+= 4;
+        }
+    }
+    return score;
+
+}
+
+function calculateFives(playerDice){
+    let score = 0;
+    for (let i = 0; i < playerDice.length; i++){
+        if (playerDice[i] === 5){
+            score+= 5;
+        }
+    }
+    return score;
+
+}
+
+function calculateSixes(playerDice){
+    let score = 0;
+    for (let i = 0; i < playerDice.length; i++){
+        if (playerDice[i] === 6){
+            score+= 6;
+        }
+    }
+    return score;
+
+}
