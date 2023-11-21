@@ -61,7 +61,7 @@ function removeColumn(snapshot){
     startGameButton.addEventListener('click', function() {
         //console.log("Starting game");
         update(gameStartedRef, {isGameStarted: true});
-        update((ref(database, 'game_state')), {turn: `${playerList[0]}`});
+        set((ref(database, `game_state`)), {turn: `${playerList[0]}`});
         set(gameRollsRef, {                    
             ones: 0,
             twos: 0,
@@ -78,7 +78,7 @@ function removeColumn(snapshot){
             yahtzee: 0,
             chance: 0,
             total: 0});
-        
+        set((ref(database, 'game_state')), {isRollClicked: false});
     });
 
     function initGame() {
