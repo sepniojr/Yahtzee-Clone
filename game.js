@@ -19,24 +19,46 @@ diceElements.forEach(dice => {
 
 const rollButton = document.getElementById("rollButton");
 let rowElements;
+let rowElementsArr;
 
 const gameStateRef = ref(database, 'game_state');
 const gameStateTurnRef = ref(database, `game_state/turn`);
 const playerCountRef = ref(database, 'player_count');
 const gameRollsRef = ref(database, 'game_state/current_roll');
 const rollCheckRef = ref(database, 'game_state/isRollClicked');
-const rowClickCheckRef = ref(database, 'game_state/isRowClicked');
+const rowClickCheckRef = ref(database, 'game_state/row_click_data');
 const gameStartedRef = ref(database, `game_state/isGameStarted/isGameStarted`);
 const gameStateDiceRef = ref(database, `game_state/dice`);
-
+const TABLE_ORDER = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes', 'bonus', 'threeOfAKind', 'fourOfAKind', 'fullHouse', 'smStraight', 'lgStraight', 'yahtzee', 'chance', 'total'];
 let currentPlayer;
 let rollCount = 0;
 let isFirstTurn = true;
 let playerDice = [];
+let selectedRowsArr = [];
 
 function getPlayerReference(player){
     let playerRef = ref(database, `players/${player}`);
     return playerRef;
+}
+
+function resetDice(){
+    /**
+     * This function clears the dice of it's 'clicked' state afnd resets them visually to 1's
+     */
+    console.log("Resetting dice...");
+    for (let i=0; i<5; i++){
+        let gameStateDiceInit = ref(database, `game_state/dice/dice${i+1}`);
+        set(gameStateDiceInit, {
+            roll : 0,
+            img : "dice1.png"
+        });
+    }
+    diceElements.forEach(dice => {
+        if (dice.classList.contains('clicked')){
+            dice.classList.toggle('clicked');
+
+        }
+    });
 }
 
 function changeTurn(){
@@ -44,7 +66,7 @@ function changeTurn(){
      * Function responsible for changing the value of currentPlayer
      */
 
-    setRowElements();
+    resetDice();
 
     if (!isFirstTurn){
         console.log("This is NOT the first turn");
@@ -100,16 +122,20 @@ function setDataStartOfGame(){
         if (isGameStarted){
             //currentPlayer = playerList[0];
             changeTurn()
-
-
         }
     });
 }
 
 function setRowElements(){
+    /**
+     * This function adds click listeners to the row cells
+     */
+    //TODO: Fix it so that users are unable to click cells that already have a value in them
     onValue(gameStartedRef, (snapshot) => {
-        console.log("Row element set triggered")
-        let rowElements = document.querySelectorAll('.clickableCell');
+
+        rowElements = document.querySelectorAll('.clickableCell');
+        rowElementsArr = Array.from(rowElements);
+        console.log(rowElementsArr[0]);
 
         rowElements.forEach(row => {
             row.removeEventListener('click', rowClickHandler);
@@ -119,17 +145,45 @@ function setRowElements(){
 }
 
 function rowClickHandler(event){
-    if (auth.currentUser.uid === currentPlayer){
-        update(gameStateRef, {isRowClicked: true});
+    /**
+     * This function is called when a row is clicked. Players are only allowed to click on their own rows on their own turn.
+     */
+    if (auth.currentUser.uid === currentPlayer && event.currentTarget.id.includes(currentPlayer) && !selectedRowsArr.includes(event.currentTarget.id)){
+        selectedRowsArr.push(event.currentTarget.id);
+        console.log(selectedRowsArr);
+        update(rowClickCheckRef, {
+            rowId: event.currentTarget.id,
+            rowValue: event.currentTarget.textContent
+        });
+    } else if (selectedRowsArr.includes(event.currentTarget.id)) {
+        console.log("Row has already been selected!");
+    } else if (auth.currentUser.uid === currentPlayer && !event.currentTarget.id.includes(currentPlayer)){
+        console.log("This isn't your row!");
     } else {
         console.log("It's not your turn!");
     }
-    
-
 } 
 
 function rowClickListener(){
-    
+    /**
+     * This function triggers when a row is clicked.
+     */
+    onValue(rowClickCheckRef, (snapshot) => {
+        if (snapshot.exists()){
+            let rowClicked = snapshot.val().rowId;
+            let rowValue = snapshot.val().rowValue;
+            let rowLabel = rowClicked.replace(currentPlayer, '')
+            let playerScoreRef = ref(database, `players/${currentPlayer}/score`);
+            let rowObject = rowElementsArr.find(element => element.id === rowClicked)
+            
+            rowObject.classList.add('clickedRow');
+
+            update(playerScoreRef, {[rowLabel] : rowValue});
+             
+            changeTurn();
+        }
+
+    });
 }
 
 function rollButtonListener(){
@@ -238,22 +292,22 @@ function calculateTempScores(playerDice){
 }
 
 function displayTempScores(){
-
     // CurrentPlayer is being updated properly which is Why Player1 is seeing the correct columns update
     // However Player2 isnt being updated properly
     onValue(gameRollsRef, (snapshot) => {
         if (snapshot.val()){
-            console.log("In displayTempScores ", currentPlayer );
-            const playerRowElements = document.querySelectorAll('.cell[id*="' + currentPlayer + '"]')
-            //console.log(auth.currentUser.uid);
+            let currentRoll = snapshot.val();
+            const playerRowElements = document.querySelectorAll('.cell[id*="' + currentPlayer + '"]');
+            
+            //TODO: Think of better way to do this
             const rows = Array.from(playerRowElements);
 
-            rows[0].textContent = snapshot.val().ones;
-            rows[1].textContent = snapshot.val().twos;
-            rows[2].textContent = snapshot.val().threes;
-            rows[3].textContent = snapshot.val().fours;
-            rows[4].textContent = snapshot.val().fives;
-            rows[5].textContent = snapshot.val().sixes;
+            for (let i = 0; i < 6; i++){
+                if (!rows[i].classList.contains('clickedRow')){
+                    rows[i].textContent = currentRoll[TABLE_ORDER[i]];
+                }
+            }
+
         }
    
 
@@ -268,6 +322,8 @@ function displayTempScores(){
     rollButtonListener();
     displayTempScores();
     displayDiceRoll();
+    setRowElements();
+    rowClickListener();
     // ChangeTurn() should actually be called when the user clicks a row element, but NOT within a click listener
     // But instead via listening to the database. Clicking a row element should update a value in the database
     // Which will be listened to and then changeTurn() will be called.

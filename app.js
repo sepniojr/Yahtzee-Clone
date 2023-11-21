@@ -69,7 +69,7 @@ function removeColumn(snapshot){
             fours: 0,
             fives: 0,
             sixes: 0,
-            bonuses: 0,
+            bonus: 0,
             threeOfAKind: 0,
             fourOfAKind: 0,
             fullHouse: 0,
@@ -229,7 +229,7 @@ function removeColumn(snapshot){
                 if (playerRef) {
                     playerCount--;
                     update(playerCountRef, {count : playerCount});
-                    
+
                     onDisconnect(playerRef).remove();
                     onDisconnect(gameStateRef).remove();
                     onDisconnect(ref(database, 'player_count')).remove();
