@@ -78,7 +78,7 @@ function removeColumn(snapshot){
             yahtzee: 0,
             chance: 0,
             total: 0});
-        set((ref(database, 'game_state')), {isRollClicked: false});
+        update((ref(database, 'game_state')), {isRollClicked: false});
     });
 
     function initGame() {

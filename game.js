@@ -106,7 +106,7 @@ function rollButtonListener(){
             if (rollCount < 3){
                 rollCount++;
                 console.log("Roll #",rollCount);
-                update(gameStateRef, {isRollClicked: true});
+
                 rollDice();
                 // let diceArr = createDiceToRoll();
                 // playerDice = rollDice(diceArr); 
@@ -120,8 +120,8 @@ function rollButtonListener(){
 }
 
 function rollDice(){
+    update(gameStateRef, {isRollClicked: true});
     onValue(rollCheckRef, (snapshot) => {
-        update(gameStateRef, {isRollClicked: false});
         if (snapshot.exists() && snapshot.val() === true){
             console.log("Rolling");
             let diceToRoll = createDiceToRoll();
@@ -164,6 +164,7 @@ function displayDiceRoll(){
         }
 
     });
+    update(gameStateRef, {isRollClicked: false});
 }
 function createDiceToRoll(){
     console.log("Creating dice to roll");
