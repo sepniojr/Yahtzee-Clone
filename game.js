@@ -1,6 +1,6 @@
 import { auth, database } from "/firebase.js"
-import { ref, set, child, get, onValue, onChildAdded, onChildRemoved, onDisconnect, update} from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
-import {playerList} from "/app.js";
+import { ref, set, increment, onValue, update, get} from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
+import {playerList, playerCount} from "/app.js";
 
 const diceElements = document.querySelectorAll(".dice");
 diceElements.forEach(dice => {
@@ -30,12 +30,14 @@ const rowClickCheckRef = ref(database, 'game_state/row_click_data');
 const gameStartedRef = ref(database, `game_state/isGameStarted/isGameStarted`);
 const gameStateDiceRef = ref(database, `game_state/dice`);
 const TABLE_ORDER = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes', 'bonus', 'threeOfAKind', 'fourOfAKind', 'fullHouse', 'smStraight', 'lgStraight', 'yahtzee', 'chance', 'total'];
+const bonusCategoryArr = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes'];
 let currentPlayer;
 let rollCount = 0;
 let isFirstTurn = true;
 let playerDice = [];
 let selectedRowsArr = [];
-
+let currentPlayerScoreRef;
+let indexOfCurrentPlayer = 0;
 function getPlayerReference(player){
     let playerRef = ref(database, `players/${player}`);
     return playerRef;
@@ -65,12 +67,12 @@ function changeTurn(){
     /**
      * Function responsible for changing the value of currentPlayer
      */
-
+    
     resetDice();
 
     if (!isFirstTurn){
-        console.log("This is NOT the first turn");
-        let indexOfCurrentPlayer = playerList.indexOf(currentPlayer);
+        clearTempScores();
+        indexOfCurrentPlayer = playerList.indexOf(currentPlayer);
 
         // Change the previous player's turn to false
         update(getPlayerReference(currentPlayer), {turn: false});
@@ -92,13 +94,15 @@ function changeTurn(){
 
         rollCount = 0;
         
-        console.log("Next player's turn: ", currentPlayer);
+        // console.log("Next player's turn: ", currentPlayer);
         
-    } else {
-        console.log("This is the first turn");
+    } else {    
+        // console.log("This is the first turn");
         currentPlayer = playerList[0];
         isFirstTurn = false;
     }
+
+    currentPlayerScoreRef = ref(database, `players/${currentPlayer}/score`);
 }
 
 function changeRollButtonVisibility(){
@@ -119,6 +123,7 @@ function setDataStartOfGame(){
     // Set current player to first player in playerList
     onValue(gameStartedRef, (snapshot) => {
         let isGameStarted = snapshot.val();
+        console.log("Starting the game with " + playerCount + " players");
         if (isGameStarted){
             //currentPlayer = playerList[0];
             changeTurn()
@@ -135,7 +140,6 @@ function setRowElements(){
 
         rowElements = document.querySelectorAll('.clickableCell');
         rowElementsArr = Array.from(rowElements);
-        console.log(rowElementsArr[0]);
 
         rowElements.forEach(row => {
             row.removeEventListener('click', rowClickHandler);
@@ -150,11 +154,21 @@ function rowClickHandler(event){
      */
     if (auth.currentUser.uid === currentPlayer && event.currentTarget.id.includes(currentPlayer) && !selectedRowsArr.includes(event.currentTarget.id)){
         selectedRowsArr.push(event.currentTarget.id);
-        console.log(selectedRowsArr);
+        update(currentPlayerScoreRef, {
+            total: increment(parseInt(event.currentTarget.textContent))
+        });
+        
+        if (bonusCategoryArr.includes(event.currentTarget.id.replace(currentPlayer, ''))){
+            update(currentPlayerScoreRef, {
+                bonus: increment(parseInt(event.currentTarget.textContent))
+            });
+        }
+
         update(rowClickCheckRef, {
             rowId: event.currentTarget.id,
             rowValue: event.currentTarget.textContent
         });
+
     } else if (selectedRowsArr.includes(event.currentTarget.id)) {
         console.log("Row has already been selected!");
     } else if (auth.currentUser.uid === currentPlayer && !event.currentTarget.id.includes(currentPlayer)){
@@ -173,13 +187,14 @@ function rowClickListener(){
             let rowClicked = snapshot.val().rowId;
             let rowValue = snapshot.val().rowValue;
             let rowLabel = rowClicked.replace(currentPlayer, '')
-            let playerScoreRef = ref(database, `players/${currentPlayer}/score`);
+            //let currentPlayerScoreRef = ref(database, `players/${currentPlayer}/score`);
             let rowObject = rowElementsArr.find(element => element.id === rowClicked)
             
             rowObject.classList.add('clickedRow');
 
-            update(playerScoreRef, {[rowLabel] : rowValue});
-             
+            displayTotalScore();
+
+            update(currentPlayerScoreRef, {[rowLabel] : rowValue});
             changeTurn();
         }
 
@@ -213,8 +228,7 @@ function rollDice(){
         if (snapshot.exists() && snapshot.val() === true){
             console.log("Rolling");
             let diceToRoll = createDiceToRoll();
-            //console.log(diceToRoll);
-
+            console.log("Dice to roll: ", diceToRoll);
             for (let i=0; i<diceToRoll.length; i++){
                 let currDice = diceToRoll[i];
                 let diceRoll = Math.floor(Math.random()*6)+1;
@@ -254,6 +268,7 @@ function displayDiceRoll(){
     });
     update(gameStateRef, {isRollClicked: false});
 }
+
 function createDiceToRoll(){
     console.log("Creating dice to roll");
     /**
@@ -268,11 +283,10 @@ function createDiceToRoll(){
         clickedDice.forEach(dice => {
             let diceIndex = dice.id.replace('dice', '');
             diceArr.push(parseInt(diceIndex));
-            //console.log(diceIndex)
         });
 
     } else {
-        diceArr = [0,0,0,0,0];
+        diceArr = [1,2,3,4,5];
     }
 
     return diceArr;
@@ -286,24 +300,30 @@ function calculateTempScores(playerDice){
         threes: calculateThrees(playerDice),
         fours: calculateFours(playerDice),
         fives: calculateFives(playerDice),
-        sixes: calculateSixes(playerDice)
+        sixes: calculateSixes(playerDice),
+        threeOfAKind: calculateTOAK(playerDice),
+        fourOfAKind: calculateFOAK(playerDice),
+        fullHouse: calculateFullHouse(playerDice),
+        smStraight: calculateSmStraight(playerDice),
+        lgStraight: calculateLgStraight(playerDice),
+        yahtzee: calculateYahtzee(playerDice),
+        chance: calculateChance(playerDice)
+        // chance: calculateChance(playerDice)
     });
 
 }
 
 function displayTempScores(){
-    // CurrentPlayer is being updated properly which is Why Player1 is seeing the correct columns update
-    // However Player2 isnt being updated properly
+
     onValue(gameRollsRef, (snapshot) => {
         if (snapshot.val()){
             let currentRoll = snapshot.val();
             const playerRowElements = document.querySelectorAll('.cell[id*="' + currentPlayer + '"]');
             
-            //TODO: Think of better way to do this
             const rows = Array.from(playerRowElements);
 
-            for (let i = 0; i < 6; i++){
-                if (!rows[i].classList.contains('clickedRow')){
+            for (let i = 0; i < TABLE_ORDER.length; i++){
+                if (!rows[i].classList.contains('clickedRow') && !rows[i].classList.contains('totalCell')){
                     rows[i].textContent = currentRoll[TABLE_ORDER[i]];
                 }
             }
@@ -312,6 +332,36 @@ function displayTempScores(){
    
 
     });
+}
+
+function displayTotalScore(){
+    playerList.forEach((player, index) => {
+        let totalPlayerElement = document.getElementById('total' + player);
+        if (totalPlayerElement) {
+            // Perform actions with the selected element
+            let playerTotalScoreRef = ref(database, `players/${player}/score/total`);
+            onValue(playerTotalScoreRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    totalPlayerElement.textContent = snapshot.val();
+                }
+            });
+
+            
+          } else {
+            console.log('Element not found.');
+          }
+    });
+        
+}
+
+function clearTempScores(){
+    const playerRowElements = document.querySelectorAll('.cell[id*="' + currentPlayer + '"]');
+    const rows = Array.from(playerRowElements);
+    for (let i = 0; i < TABLE_ORDER.length; i++){
+        if (!rows[i].classList.contains('clickedRow') && !rows[i].classList.contains('totalCell')){
+            rows[i].textContent = '';
+        }
+    }
 }
 
 (function()  {
@@ -324,15 +374,14 @@ function displayTempScores(){
     displayDiceRoll();
     setRowElements();
     rowClickListener();
-    // ChangeTurn() should actually be called when the user clicks a row element, but NOT within a click listener
-    // But instead via listening to the database. Clicking a row element should update a value in the database
-    // Which will be listened to and then changeTurn() will be called.
-    onChildAdded(ref(database, 'test'), (snapshot) => {
-        console.log("CHANGING TURN MANUALLY ACTIVATED BY USER");
-        changeTurn();
-    });
+    
 
 })();
+
+
+function displayBonus(){
+
+}
 
 function calculateOnes(playerDice){
     let score = 0;
@@ -397,4 +446,94 @@ function calculateSixes(playerDice){
     }
     return score;
 
+}
+
+function calculateTOAK(playerDice){
+    let total = 0;
+    const count = [];
+    for (let i = 0; i<playerDice.length;i++){
+        total += playerDice[i];
+    }
+    for (const i of playerDice){
+        count[i] = (count[i] || 0) + 1;
+        if (count[i] >= 3){
+            console.log(i, count[i]);
+            return total;
+        } 
+    }
+    return 0;
+}
+
+function calculateFOAK(playerDice){
+    let total = 0;
+    const count = [];
+    for (let i = 0; i<playerDice.length;i++){
+        total += playerDice[i];
+    }
+    for (const i of playerDice){
+        count[i] = (count[i] || 0) + 1;
+        if (count[i] >= 4){
+            console.log(i, count[i]);
+            return total;
+        } 
+    }
+    return 0;
+}
+
+function calculateFullHouse(playerDice){
+
+    const count = {};
+    for (const i of playerDice){
+        count[i] = (count[i] || 0) + 1;
+    }
+    let values = Object.values(count);
+
+    if ((values[0] === 3 && values[1] === 2) || (values[1] === 3 && values[0] === 2)){
+        return 25;
+    } else {
+        return 0;
+    }
+
+}
+
+function calculateSmStraight(playerDice){
+    let dice = [...new Set(playerDice)];
+    let sortedDice = dice.sort();
+    let string =  sortedDice.join('');
+    if (string.includes('1234') || string.includes('2345') || string.includes('3456')){
+        return 30;
+    } else {
+        return 0;
+    }
+
+}
+
+function calculateLgStraight(playerDice){
+    let dice = [...new Set(playerDice)];
+    let sortedDice = dice.sort();
+    let string =  sortedDice.join('');
+    if (string.includes('12345') || string.includes('23456')){
+        return 40;
+    } else {
+        return 0;
+    }
+
+
+}
+
+function calculateYahtzee(playerDice){
+
+    if (playerDice.every(dice => dice === playerDice[0])){
+        return 50;
+    } else {
+        return 0;
+    }
+}
+
+function calculateChance(playerDice){
+    let score = 0;
+    for (let i=0;i<playerDice.length;i++){
+        score += playerDice[i];
+    }
+    return score;
 }

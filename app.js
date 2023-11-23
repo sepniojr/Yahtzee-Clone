@@ -2,8 +2,8 @@
 import { signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-auth.js";
 import { ref, set, child, get, onValue, onChildAdded, onChildRemoved, onDisconnect, update} from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
 import { auth, database } from "/firebase.js"
-export { playerList}
-
+export { playerList, playerCount};
+let playerCount = 0;
 const allPlayersRef = ref(database, 'players');
 const playerCountRef = ref(database, `player_count`);
 const gameStartedRef = ref(database, `game_state/isGameStarted`);
@@ -25,16 +25,25 @@ function addNewColumn(snapshot) {
 
     // Loop through each row and add a new cell for the new column
     rows.forEach((row, index) => {
-        const newCell = document.createElement('div');
-        const newCellId = TABLE_ORDER[index] + playerId;
+        if (TABLE_ORDER[index] != 'total'){
+            const newCell = document.createElement('div');
+            const newCellId = TABLE_ORDER[index] + playerId;
+            newCell.classList.add('cell', 'clickableCell');
+            newCell.setAttribute('id', newCellId);
+            newCell.textContent = '';
+            row.appendChild(newCell);
+        } else {
+            // For the 'total' row, we don't want to make the cell clickable
+            const newCell = document.createElement('div');
+            const newCellId = TABLE_ORDER[index] + playerId;
+            newCell.classList.add('cell', 'totalCell');
+            newCell.setAttribute('id', newCellId);
+            newCell.textContent = '';
+            row.appendChild(newCell);
+        }
 
-        newCell.classList.add('cell', 'clickableCell');
-        newCell.setAttribute('id', newCellId);
-        newCell.textContent = '';
-        row.appendChild(newCell);
     });
-
-
+    
 }
 
 function removeColumn(snapshot){
@@ -55,7 +64,6 @@ function removeColumn(snapshot){
     let playerId;
     let playerRef;
     let gameStateRef;
-    let playerCount = 0;
                     
     
     startGameButton.addEventListener('click', function() {
@@ -114,11 +122,11 @@ function removeColumn(snapshot){
             // A new player joins the game
 
             playerCount++;
-            console.log("Player count after join: ", playerCount);
+            // console.log("Player count after join: ", playerCount);
             update(playerCountRef, {count : playerCount});
 
             playerList.push(snapshot.val().id);
-            console.log("Player list after join: ", playerList);
+            // console.log("Player list after join: ", playerList);
 
             addNewColumn(snapshot);
 
@@ -150,7 +158,7 @@ function removeColumn(snapshot){
         playerRef = ref(database, `players/${playerId}`);
         get(playerRef).then((snapshot) => {
             if (!snapshot.exists()) {
-                console.log(`Adding ${name} to player database`);
+                // console.log(`Adding ${name} to player database`);
                 if (playerList.length === 0) {
                     // This player is the host
                     // TODO: Find way to change host when original host leaves the game
