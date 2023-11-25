@@ -6,7 +6,8 @@ export { playerList, playerCount};
 let playerCount = 0;
 const allPlayersRef = ref(database, 'players');
 const playerCountRef = ref(database, `player_count`);
-const gameStartedRef = ref(database, `game_state/isGameStarted`);
+const gameStateRef = ref(database, `game_state`);
+const gameStartedRef = ref(database, 'game_state/isGameStarted');
 const gameRollsRef = ref(database, 'game_state/current_roll');
 const TABLE_ORDER = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes', 'bonus', 'threeOfAKind', 'fourOfAKind', 'fullHouse', 'smStraight', 'lgStraight', 'yahtzee', 'chance', 'total'];
 const startGameButton = document.getElementById("startGameButton");
@@ -25,7 +26,7 @@ function addNewColumn(snapshot) {
 
     // Loop through each row and add a new cell for the new column
     rows.forEach((row, index) => {
-        if (TABLE_ORDER[index] != 'total'){
+        if (TABLE_ORDER[index] != 'total' && TABLE_ORDER[index] != 'bonus'){
             const newCell = document.createElement('div');
             const newCellId = TABLE_ORDER[index] + playerId;
             newCell.classList.add('cell', 'clickableCell');
@@ -36,7 +37,7 @@ function addNewColumn(snapshot) {
             // For the 'total' row, we don't want to make the cell clickable
             const newCell = document.createElement('div');
             const newCellId = TABLE_ORDER[index] + playerId;
-            newCell.classList.add('cell', 'totalCell');
+            newCell.classList.add('cell', 'unclickableCell');
             newCell.setAttribute('id', newCellId);
             newCell.textContent = '';
             row.appendChild(newCell);
@@ -63,12 +64,11 @@ function removeColumn(snapshot){
 
     let playerId;
     let playerRef;
-    let gameStateRef;
                     
     
     startGameButton.addEventListener('click', function() {
         //console.log("Starting game");
-        update(gameStartedRef, {isGameStarted: true});
+        update(gameStateRef, {isGameStarted: true});
         set((ref(database, `game_state`)), {turn: `${playerList[0]}`});
         set(gameRollsRef, {                    
             ones: 0,
@@ -87,12 +87,13 @@ function removeColumn(snapshot){
             chance: 0,
             total: 0});
         update((ref(database, 'game_state')), {isRollClicked: false});
+        update((ref(database, 'game_state')), {bonusCheck: false});
     });
 
     function initGame() {
         get(gameStartedRef).then((snapshot) => {
             if (!snapshot.exists()) {
-                set(gameStartedRef, {
+                update(gameStateRef, {
                     isGameStarted : false
                 });
             } else {
@@ -102,7 +103,7 @@ function removeColumn(snapshot){
 
         onValue(gameStartedRef, (snapshot) => {
             if (snapshot.exists()){
-                const isGameStarted = snapshot.val().isGameStarted;
+                const isGameStarted = snapshot.val();
                 console.log("Is game started? ", isGameStarted);
                 if (isGameStarted) {
                     const submitButton = document.getElementById("submitButton");
@@ -112,7 +113,7 @@ function removeColumn(snapshot){
                     submitButton.style.display = 'none';
                     startGameButton.style.display = 'none';
                 } else {
-                    update(gameStartedRef, {isGameStarted: false});
+                    update(gameStateRef, {isGameStarted: false});
                 }
             }
         
@@ -166,7 +167,8 @@ function removeColumn(snapshot){
                         id: playerId,
                         name: name,
                         host: true,
-                        turn: true
+                        turn: true,
+                        bonusReached: false
                     });
                 } else {
                     // Player is not host
@@ -174,7 +176,8 @@ function removeColumn(snapshot){
                         id: playerId,
                         name: name,
                         host: false,
-                        turn: false
+                        turn: false,
+                        bonusReached: false
                     });
                 }
             } else {
@@ -186,13 +189,13 @@ function removeColumn(snapshot){
             console.error('Problem setting player reference', error)
         });
 
-        gameStateRef = ref(database, `game_state/players/${playerId}`);
-        get(gameStateRef).then((snapshot) => {
+        let gameStatePlayerRef = ref(database, `game_state/players/${playerId}`);
+        get(gameStatePlayerRef).then((snapshot) => {
             //TODO: Add error checking for all gets
             if (!snapshot.exists()) {
                 console.log(`Adding ${name} to game state database`);
                 // Player does not exist, so set player data
-                set(gameStateRef, {
+                set(gameStatePlayerRef, {
                     id: playerId,
                     ones: 0,
                     twos: 0,
@@ -228,7 +231,7 @@ function removeColumn(snapshot){
             // User is signed in
             console.log('User is signed in:', user.uid);
             playerId = user.uid;
-            gameStateRef = ref(database, `game_state/players/${playerId}`);
+            let gameStatePlayerRef = ref(database, `game_state/players/${playerId}`);
 
             initGame();
 
@@ -239,7 +242,7 @@ function removeColumn(snapshot){
                     update(playerCountRef, {count : playerCount});
 
                     onDisconnect(playerRef).remove();
-                    onDisconnect(gameStateRef).remove();
+                    onDisconnect(gameStatePlayerRef).remove();
                     onDisconnect(ref(database, 'player_count')).remove();
 
                     // TODO: Remove

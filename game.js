@@ -1,5 +1,5 @@
 import { auth, database } from "/firebase.js"
-import { ref, set, increment, onValue, update, get} from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
+import { ref, set, increment, onValue, update, get, onChildAdded} from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
 import {playerList, playerCount} from "/app.js";
 
 const diceElements = document.querySelectorAll(".dice");
@@ -27,7 +27,8 @@ const playerCountRef = ref(database, 'player_count');
 const gameRollsRef = ref(database, 'game_state/current_roll');
 const rollCheckRef = ref(database, 'game_state/isRollClicked');
 const rowClickCheckRef = ref(database, 'game_state/row_click_data');
-const gameStartedRef = ref(database, `game_state/isGameStarted/isGameStarted`);
+const bonusCheckRef = ref(database, 'game_state/bonusCheck');
+const gameStartedRef = ref(database, `game_state/isGameStarted`);
 const gameStateDiceRef = ref(database, `game_state/dice`);
 const TABLE_ORDER = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes', 'bonus', 'threeOfAKind', 'fourOfAKind', 'fullHouse', 'smStraight', 'lgStraight', 'yahtzee', 'chance', 'total'];
 const bonusCategoryArr = ['ones', 'twos', 'threes', 'fours', 'fives', 'sixes'];
@@ -67,7 +68,6 @@ function changeTurn(){
     /**
      * Function responsible for changing the value of currentPlayer
      */
-    
     resetDice();
 
     if (!isFirstTurn){
@@ -135,7 +135,6 @@ function setRowElements(){
     /**
      * This function adds click listeners to the row cells
      */
-    //TODO: Fix it so that users are unable to click cells that already have a value in them
     onValue(gameStartedRef, (snapshot) => {
 
         rowElements = document.querySelectorAll('.clickableCell');
@@ -152,17 +151,23 @@ function rowClickHandler(event){
     /**
      * This function is called when a row is clicked. Players are only allowed to click on their own rows on their own turn.
      */
+    console.log("HELLOOOOOO")
     if (auth.currentUser.uid === currentPlayer && event.currentTarget.id.includes(currentPlayer) && !selectedRowsArr.includes(event.currentTarget.id)){
         selectedRowsArr.push(event.currentTarget.id);
         update(currentPlayerScoreRef, {
             total: increment(parseInt(event.currentTarget.textContent))
         });
         
+        // If the row clicked is one of ones,twos,threes,fours,fives,sixes, add the value to the bonus value
         if (bonusCategoryArr.includes(event.currentTarget.id.replace(currentPlayer, ''))){
             update(currentPlayerScoreRef, {
                 bonus: increment(parseInt(event.currentTarget.textContent))
             });
         }
+
+        update(gameStateRef, {
+            bonusCheck: true
+        })
 
         update(rowClickCheckRef, {
             rowId: event.currentTarget.id,
@@ -184,6 +189,7 @@ function rowClickListener(){
      */
     onValue(rowClickCheckRef, (snapshot) => {
         if (snapshot.exists()){
+            console.log("ROW IS CLICKED!");
             let rowClicked = snapshot.val().rowId;
             let rowValue = snapshot.val().rowValue;
             let rowLabel = rowClicked.replace(currentPlayer, '')
@@ -193,11 +199,20 @@ function rowClickListener(){
             rowObject.classList.add('clickedRow');
 
             displayTotalScore();
-
+            displayBonus();
             update(currentPlayerScoreRef, {[rowLabel] : rowValue});
             changeTurn();
         }
 
+    });
+}
+
+function checkForBonus(){
+    // After a row is clicked, check if that player has satisfied their bonus
+    onValue(bonusCheckRef, (snapshot) => {
+        if (snapshot.val()){
+
+        }
     });
 }
 
@@ -239,7 +254,7 @@ function rollDice(){
                 });
             }
 
-            console.log(playerDice);
+            //console.log(playerDice);
             calculateTempScores(playerDice);
         }
     });
@@ -323,7 +338,7 @@ function displayTempScores(){
             const rows = Array.from(playerRowElements);
 
             for (let i = 0; i < TABLE_ORDER.length; i++){
-                if (!rows[i].classList.contains('clickedRow') && !rows[i].classList.contains('totalCell')){
+                if (!rows[i].classList.contains('clickedRow') && !rows[i].classList.contains('unclickableCell')){
                     rows[i].textContent = currentRoll[TABLE_ORDER[i]];
                 }
             }
@@ -335,13 +350,14 @@ function displayTempScores(){
 }
 
 function displayTotalScore(){
-    playerList.forEach((player, index) => {
-        let totalPlayerElement = document.getElementById('total' + player);
+    playerList.forEach((player) => {    });
+        let totalPlayerElement = document.getElementById('total' + currentPlayer);
         if (totalPlayerElement) {
             // Perform actions with the selected element
-            let playerTotalScoreRef = ref(database, `players/${player}/score/total`);
-            onValue(playerTotalScoreRef, (snapshot) => {
+            let playerTotalScoreRef = ref(database, `players/${currentPlayer}/score/total`);
+            get(playerTotalScoreRef).then((snapshot) => {
                 if (snapshot.exists()) {
+                    console.log("TESTESTESTEST");
                     totalPlayerElement.textContent = snapshot.val();
                 }
             });
@@ -350,7 +366,7 @@ function displayTotalScore(){
           } else {
             console.log('Element not found.');
           }
-    });
+
         
 }
 
@@ -358,7 +374,7 @@ function clearTempScores(){
     const playerRowElements = document.querySelectorAll('.cell[id*="' + currentPlayer + '"]');
     const rows = Array.from(playerRowElements);
     for (let i = 0; i < TABLE_ORDER.length; i++){
-        if (!rows[i].classList.contains('clickedRow') && !rows[i].classList.contains('totalCell')){
+        if (!rows[i].classList.contains('clickedRow') && !rows[i].classList.contains('unclickableCell')){
             rows[i].textContent = '';
         }
     }
@@ -374,12 +390,43 @@ function clearTempScores(){
     displayDiceRoll();
     setRowElements();
     rowClickListener();
-    
+
 
 })();
 
-
 function displayBonus(){
+
+        let bonusPlayerElement = document.getElementById('bonus' + currentPlayer);
+        let bonusReached;
+        if (bonusPlayerElement) {
+            // Perform actions with the selected element
+            let playerBonusScoreRef = ref(database, `players/${currentPlayer}/score/bonus`);
+            let playerBonusReachedRef = ref(database, `players/${currentPlayer}/bonusReached`);
+            get(playerBonusReachedRef).then((snapshot) => {
+                bonusReached = snapshot.val();
+            });
+            get(playerBonusScoreRef).then((snapshot) => {
+                if (snapshot.exists()) {
+                    if (snapshot.val() >= 63){
+                        console.log(currentPlayer + " has got the bonus!");
+                        if (bonusReached === false ){
+                            update(currentPlayerScoreRef, {
+                                total: increment(35)
+                            });
+                        }
+                        bonusPlayerElement.textContent = 35;
+                        update(getPlayerReference(currentPlayer), {
+                            bonusReached: true
+                        });
+                    }
+
+                }
+            });
+
+          } else {
+            console.log('Element not found.');
+          }
+    
 
 }
 
