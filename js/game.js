@@ -262,8 +262,8 @@ function displayDiceRoll(){
                 faceElements.forEach((diceFace, index) => {
                     const diceKey = `dice${index + 1}`; // Form the key based on index 
                     if (snapshot.val()[diceKey] && snapshot.val()[diceKey].img){
-                        let imageUrl = snapshot.val()[diceKey].img; // Access the img property
-                        diceFace.setAttribute('src', imageUrl);
+                        let imageUrl = snapshot.val()[diceKey].img;
+                        diceFace.setAttribute('src', imageUrl.replace('.', ''));
                     }
                 });
             }
