@@ -1,7 +1,7 @@
 
 import { signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.6/firebase-auth.js";
 import { ref, set, child, get, onValue, onChildAdded, onChildRemoved, onDisconnect, update} from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
-import { auth, database } from "/firebase.js"
+import { auth, database } from "./firebase.js"
 export { playerList, playerCount};
 let playerCount = 0;
 const allPlayersRef = ref(database, 'players');
