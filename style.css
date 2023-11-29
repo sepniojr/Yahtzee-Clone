@@ -28,7 +28,7 @@
 }
 
 .clickedRow{
-    background-color: #ffcc00;
+    background-color: #00ff40;
 }
 
 .dice{
@@ -53,6 +53,7 @@
     border: 2px solid;
     text-align: center;
     padding: 10px;
+    
 }
 
 .game-container{
