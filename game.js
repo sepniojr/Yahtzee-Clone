@@ -53,7 +53,7 @@ function resetDice(){
         let gameStateDiceInit = ref(database, `game_state/dice/dice${i+1}`);
         set(gameStateDiceInit, {
             roll : 0,
-            img : "dice1.png"
+            img : "images/dice1.png"
         });
     }
     diceElements.forEach(dice => {
@@ -240,7 +240,7 @@ function rollDice(){
                 playerDice[currDice-1] = diceRoll;
                 update(gameStateDiceRef, {
                     [`dice${currDice}/roll`] : diceRoll,
-                    [`dice${currDice}/img`] : "dice" + diceRoll + ".png"
+                    [`dice${currDice}/img`] : "images/dice" + diceRoll + ".png"
                 });
             }
 
