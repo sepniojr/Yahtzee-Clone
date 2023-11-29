@@ -12,7 +12,7 @@ diceElements.forEach(dice => {
             // TODO: Make clicked dice visible to other players via firebase
             this.classList.toggle('clicked');
         } else {
-            console.log("You can't click this yet!");
+            alert("You can't click this yet!");
         }
     });
 });
@@ -48,7 +48,6 @@ function resetDice(){
     /**
      * This function clears the dice of it's 'clicked' state afnd resets them visually to 1's
      */
-    console.log("Resetting dice...");
     for (let i=0; i<5; i++){
         let gameStateDiceInit = ref(database, `game_state/dice/dice${i+1}`);
         set(gameStateDiceInit, {
@@ -96,10 +95,8 @@ async function changeTurn(){
 
         rollCount = 0;
         
-        // console.log("Next player's turn: ", currentPlayer);
         
     } else {    
-        // console.log("This is the first turn");
         currentPlayer = playerList[0];
         isFirstTurn = false;
     }
@@ -111,7 +108,6 @@ function changeRollButtonVisibility(){
     // Change visibility of roll button when player turn changes
     onValue(gameStateTurnRef, (snapshot) => {
         if (snapshot.exists()){
-            console.log("Changing visibility of roll button for ",snapshot.val());
             if (auth.currentUser.uid === snapshot.val()) {
                 rollButton.style.display = "block";
             } else {
@@ -173,11 +169,11 @@ function rowClickHandler(event){
         });
 
     } else if (selectedRowsArr.includes(event.currentTarget.id)) {
-        console.log("Row has already been selected!");
+        alert("Row has already been selected!");
     } else if (auth.currentUser.uid === currentPlayer && !event.currentTarget.id.includes(currentPlayer)){
-        console.log("This isn't your row!");
+        alert("This isn't your row!");
     } else {
-        console.log("It's not your turn!");
+        alert("It's not your turn!");
     }
 } 
 
@@ -187,7 +183,6 @@ function rowClickListener(){
      */
     onValue(rowClickCheckRef, (snapshot) => {
         if (snapshot.exists()){
-            console.log("ROW IS CLICKED!");
             let rowClicked = snapshot.val().rowId;
             let rowValue = snapshot.val().rowValue;
             let rowLabel = rowClicked.replace(currentPlayer, '')
@@ -216,13 +211,10 @@ function rollButtonListener(){
                 console.log("Roll #",rollCount);
 
                 rollDice();
-                // let diceArr = createDiceToRoll();
-                // playerDice = rollDice(diceArr); 
-                //console.log("Player has rolled: ", playerDice);
                 
     
             } else {
-                console.log("No more rolls left");
+                alert("No more rolls left");
             }
     });
 }
@@ -231,9 +223,9 @@ function rollDice(){
     update(gameStateRef, {isRollClicked: true});
     onValue(rollCheckRef, (snapshot) => {
         if (snapshot.exists() && snapshot.val() === true){
-            console.log("Rolling");
+
             let diceToRoll = createDiceToRoll();
-            console.log("Dice to roll: ", diceToRoll);
+
             for (let i=0; i<diceToRoll.length; i++){
                 let currDice = diceToRoll[i];
                 let diceRoll = Math.floor(Math.random()*6)+1;
@@ -244,19 +236,16 @@ function rollDice(){
                 });
             }
 
-            //console.log(playerDice);
             calculateTempScores(playerDice);
         }
     });
 }
 
 function displayDiceRoll(){
-    console.log("In display dice roll");
 
     // Updates whenever changes in game_state/dice occur
     onValue(gameStateDiceRef, (snapshot) => {
         if (snapshot.val()){
-            //console.log(snapshot.val()[dice1]);
             const faceElements = document.querySelectorAll(".face");
             if (faceElements.length > 0){
                 faceElements.forEach((diceFace, index) => {
@@ -275,7 +264,6 @@ function displayDiceRoll(){
 }
 
 function createDiceToRoll(){
-    console.log("Creating dice to roll");
     /**
      * This function creates an array with the indices of the dice to replace.
      * E.g. If the leftmost and rightmost dice are clicked, function will return array [2 3 4]
@@ -387,7 +375,6 @@ async function displayBonus(){
 
         if (bonusPlayerElement) {
             // Perform actions with the selected element
-            console.log("Current player is: ", currentPlayer);
             let playerBonusScoreRef = ref(database, `players/${currentPlayer}/score/bonus`);
             let playerBonusReachedRef = ref(database, `players/${currentPlayer}/bonusReached`);
             await get(playerBonusReachedRef).then((snapshot) => {
@@ -505,7 +492,6 @@ function calculateTOAK(playerDice){
     for (const i of playerDice){
         count[i] = (count[i] || 0) + 1;
         if (count[i] >= 3){
-            console.log(i, count[i]);
             return total;
         } 
     }
@@ -521,7 +507,6 @@ function calculateFOAK(playerDice){
     for (const i of playerDice){
         count[i] = (count[i] || 0) + 1;
         if (count[i] >= 4){
-            console.log(i, count[i]);
             return total;
         } 
     }
