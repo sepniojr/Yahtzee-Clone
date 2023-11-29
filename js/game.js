@@ -1,4 +1,4 @@
-import { auth, database } from "/firebase.js"
+import { auth, database } from "./firebase.js"
 import { ref, set, increment, onValue, update, get, onChildAdded} from "https://www.gstatic.com/firebasejs/9.6.6/firebase-database.js";
 import {playerList, playerCount} from "./app.js";
 
