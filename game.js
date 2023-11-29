@@ -64,13 +64,14 @@ function resetDice(){
     });
 }
 
-function changeTurn(){
+async function changeTurn(){
     /**
      * Function responsible for changing the value of currentPlayer
      */
     resetDice();
 
     if (!isFirstTurn){
+        await displayBonus();
         clearTempScores();
         indexOfCurrentPlayer = playerList.indexOf(currentPlayer);
 
@@ -83,6 +84,7 @@ function changeTurn(){
         } else {
             indexOfCurrentPlayer += 1;
         }
+
         currentPlayer = playerList[indexOfCurrentPlayer];
 
         // Change the next player's turn to true
@@ -125,7 +127,6 @@ function setDataStartOfGame(){
         let isGameStarted = snapshot.val();
         console.log("Starting the game with " + playerCount + " players");
         if (isGameStarted){
-            //currentPlayer = playerList[0];
             changeTurn()
         }
     });
@@ -151,8 +152,9 @@ function rowClickHandler(event){
     /**
      * This function is called when a row is clicked. Players are only allowed to click on their own rows on their own turn.
      */
-    console.log("HELLOOOOOO")
-    if (auth.currentUser.uid === currentPlayer && event.currentTarget.id.includes(currentPlayer) && !selectedRowsArr.includes(event.currentTarget.id)){
+    let playerBonusScoreRef = ref(database, `players/${currentPlayer}/score/bonus`);
+
+    if (auth.currentUser.uid === currentPlayer && event.currentTarget.id.includes(currentPlayer) && !selectedRowsArr.includes(event.currentTarget.id) && event.currentTarget.textContent != ''){
         selectedRowsArr.push(event.currentTarget.id);
         update(currentPlayerScoreRef, {
             total: increment(parseInt(event.currentTarget.textContent))
@@ -164,10 +166,6 @@ function rowClickHandler(event){
                 bonus: increment(parseInt(event.currentTarget.textContent))
             });
         }
-
-        update(gameStateRef, {
-            bonusCheck: true
-        })
 
         update(rowClickCheckRef, {
             rowId: event.currentTarget.id,
@@ -193,13 +191,13 @@ function rowClickListener(){
             let rowClicked = snapshot.val().rowId;
             let rowValue = snapshot.val().rowValue;
             let rowLabel = rowClicked.replace(currentPlayer, '')
-            //let currentPlayerScoreRef = ref(database, `players/${currentPlayer}/score`);
             let rowObject = rowElementsArr.find(element => element.id === rowClicked)
             
             rowObject.classList.add('clickedRow');
 
             displayTotalScore();
-            displayBonus();
+
+
             update(currentPlayerScoreRef, {[rowLabel] : rowValue});
             changeTurn();
         }
@@ -207,14 +205,6 @@ function rowClickListener(){
     });
 }
 
-function checkForBonus(){
-    // After a row is clicked, check if that player has satisfied their bonus
-    onValue(bonusCheckRef, (snapshot) => {
-        if (snapshot.val()){
-
-        }
-    });
-}
 
 function rollButtonListener(){
     // TODO: Remove listeners when turn change occurs?
@@ -350,19 +340,15 @@ function displayTempScores(){
 }
 
 function displayTotalScore(){
-    playerList.forEach((player) => {    });
         let totalPlayerElement = document.getElementById('total' + currentPlayer);
         if (totalPlayerElement) {
             // Perform actions with the selected element
             let playerTotalScoreRef = ref(database, `players/${currentPlayer}/score/total`);
             get(playerTotalScoreRef).then((snapshot) => {
                 if (snapshot.exists()) {
-                    console.log("TESTESTESTEST");
                     totalPlayerElement.textContent = snapshot.val();
                 }
             });
-
-            
           } else {
             console.log('Element not found.');
           }
@@ -394,24 +380,39 @@ function clearTempScores(){
 
 })();
 
-function displayBonus(){
-
+async function displayBonus(){
         let bonusPlayerElement = document.getElementById('bonus' + currentPlayer);
         let bonusReached;
+        let currentPlayerScore;
+
         if (bonusPlayerElement) {
             // Perform actions with the selected element
+            console.log("Current player is: ", currentPlayer);
             let playerBonusScoreRef = ref(database, `players/${currentPlayer}/score/bonus`);
             let playerBonusReachedRef = ref(database, `players/${currentPlayer}/bonusReached`);
-            get(playerBonusReachedRef).then((snapshot) => {
-                bonusReached = snapshot.val();
+            await get(playerBonusReachedRef).then((snapshot) => {
+                if (snapshot.exists()){
+                    bonusReached = snapshot.val();
+                }
             });
-            get(playerBonusScoreRef).then((snapshot) => {
+            
+            await get(currentPlayerScoreRef).then((snapshot) => {
+                if (snapshot.exists()){
+                    currentPlayerScore = snapshot.val().total;
+                }
+            })
+
+            //FIXME:
+            // The bonus gets added to the wrong players score sometimes
+            // The bonus gets incremented for each player in the game (figure out how to increment once only)
+            await get(playerBonusScoreRef).then((snapshot) => {
                 if (snapshot.exists()) {
                     if (snapshot.val() >= 63){
                         console.log(currentPlayer + " has got the bonus!");
-                        if (bonusReached === false ){
+                        if (bonusReached === false){
+                            currentPlayerScore += 35
                             update(currentPlayerScoreRef, {
-                                total: increment(35)
+                                total: currentPlayerScore
                             });
                         }
                         bonusPlayerElement.textContent = 35;
